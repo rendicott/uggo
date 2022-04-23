@@ -4,7 +4,9 @@ go 1.17
 
 replace github.com/rendicott/uggly => ../uggly
 
-require github.com/rendicott/uggly v0.1.0
+//require github.com/rendicott/uggly v0.1.0
+
+require github.com/rendicott/uggly v0.1.2
 
 require (
 	github.com/golang/protobuf v1.5.2 // indirect

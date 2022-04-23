@@ -19,6 +19,8 @@ document:
 
 push:
 	git add uggo.go
+	git add go.mod 
+	git add sites.go
 	git add README.md
 	git add Makefile
 	git commit -m "$(M)"
