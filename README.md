@@ -86,4 +86,37 @@ type PageLink struct {
 	KeyStroke string
 }
 
+type Theme struct {
+	StyleTextBoxDescription,
+	StyleTextBoxCursor,
+	StyleTextBoxText,
+	StyleTextBoxFill,
+	StyleDivFill,
+	StyleDivBorder,
+	StyleTextBlob *pb.Style
+	DivBorderWidth int32
+	DivBorderChar,
+	DivFillChar rune
+}
+    Theme holds visual settings for components and provides methods for applying
+    those settings to pages and components of pages
+
+var ThemeDefault *Theme
+var ThemeGreen *Theme
+func (t *Theme) Init()
+    Init instantiates any nil Theme settings with default values
+
+func (t *Theme) StylizeDivBox(divBox *pb.DivBox) *pb.DivBox
+    StylizeDivBox applies this theme to the provided divBox and returns it
+
+func (t *Theme) StylizePage(page *pb.PageResponse) *pb.PageResponse
+    StylizePage takes a page and applies this theme to the divBoxes, textBlobs,
+    and textBoxes within it and returns the modified page
+
+func (t *Theme) StylizeTextBlob(textBlob *pb.TextBlob) *pb.TextBlob
+    StylizeTextBlob applies this theme to the provided textBlob and returns it
+
+func (t *Theme) StylizeTextBox(textBox *pb.TextBox) *pb.TextBox
+    StylizeTextBox applies this theme to the provided textBox and returns it
+
 ```

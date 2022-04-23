@@ -7,9 +7,123 @@ import (
 	pb "github.com/rendicott/uggly"
 )
 
+func init() {
+	ThemeDefault = &Theme{}
+	ThemeGreen = &Theme{
+		StyleTextBoxDescription: Style("yellowgreen", "darkgreen"),
+		StyleTextBoxCursor:      Style("aquamarine", "darkseagreen"),
+		StyleTextBoxText:        Style("springgreen", "green"),
+		StyleTextBoxFill:        Style("springgreen", "green"),
+		StyleDivFill:            Style("darkkhaki", "darkgreen"),
+		StyleDivBorder:          Style("yellowgreen", "darkgreen"),
+		StyleTextBlob:           Style("yellowgreen", "darkgreen"),
+		DivBorderWidth:          int32(1),
+		DivBorderChar:           ConvertStringCharRune("="),
+		DivFillChar:             ConvertStringCharRune("."),
+	}
+}
+
+var ThemeDefault *Theme
+var ThemeGreen *Theme
+
 type PageLink struct {
 	Page      string
 	KeyStroke string
+}
+
+// Theme holds visual settings for components and provides methods
+// for applying those settings to pages and components of pages
+type Theme struct {
+	StyleTextBoxDescription,
+	StyleTextBoxCursor,
+	StyleTextBoxText,
+	StyleTextBoxFill,
+	StyleDivFill,
+	StyleDivBorder,
+	StyleTextBlob *pb.Style
+	DivBorderWidth int32
+	DivBorderChar,
+	DivFillChar rune
+}
+
+// Init instantiates any nil Theme settings with default
+// values
+func (t *Theme) Init() {
+	if t.StyleTextBoxDescription == nil {
+		t.StyleTextBoxDescription = Style("white", "black")
+	}
+	if t.StyleTextBoxCursor == nil {
+		t.StyleTextBoxCursor = Style("black", "white")
+	}
+	if t.StyleTextBoxText == nil {
+		t.StyleTextBoxText = Style("white", "blue")
+	}
+	if t.StyleTextBoxFill == nil {
+		t.StyleTextBoxFill = Style("white", "blue")
+	}
+	if t.StyleDivFill == nil {
+		t.StyleDivFill = Style("white", "black")
+	}
+	if t.StyleDivBorder == nil {
+		t.StyleDivBorder = Style("white", "black")
+	}
+	if t.StyleTextBlob == nil {
+		t.StyleTextBlob = Style("white", "black")
+	}
+	if t.DivFillChar == 0 {
+		t.DivFillChar = ConvertStringCharRune(" ")
+	}
+	if t.DivBorderChar == 0 {
+		t.DivBorderChar = ConvertStringCharRune("*")
+	}
+	if t.DivBorderWidth == 0 {
+		t.DivBorderWidth = int32(1)
+	}
+}
+
+// StylizePage takes a page and applies this theme to the divBoxes,
+// textBlobs, and textBoxes within it and returns the modified page
+func (t *Theme) StylizePage(page *pb.PageResponse) *pb.PageResponse {
+	for i, divBox := range page.DivBoxes.Boxes {
+		page.DivBoxes.Boxes[i] = t.StylizeDivBox(divBox)
+	}
+	for i, textBlob := range page.Elements.TextBlobs {
+		page.Elements.TextBlobs[i] = t.StylizeTextBlob(textBlob)
+	}
+	for i, form := range page.Elements.Forms {
+		for j, textBox := range form.TextBoxes {
+			page.Elements.Forms[i].TextBoxes[j] = t.StylizeTextBox(textBox)
+		}
+	}
+	return page
+}
+
+// StylizeTextBox applies this theme to the provided textBox and returns it
+func (t *Theme) StylizeTextBox(textBox *pb.TextBox) *pb.TextBox {
+	t.Init()
+	textBox.StyleCursor = t.StyleTextBoxCursor
+	textBox.StyleFill = t.StyleTextBoxFill
+	textBox.StyleDescription = t.StyleTextBoxDescription
+	textBox.StyleText = t.StyleTextBoxText
+	return textBox
+}
+
+// StylizeDivBox applies this theme to the provided divBox and returns it
+func (t *Theme) StylizeDivBox(divBox *pb.DivBox) *pb.DivBox {
+	t.Init()
+	divBox.FillSt = t.StyleDivFill
+	divBox.BorderSt = t.StyleDivBorder
+	divBox.BorderW = t.DivBorderWidth
+	divBox.FillChar = t.DivFillChar
+	divBox.BorderChar = t.DivBorderChar
+	return divBox
+}
+
+// StylizeTextBlob applies this theme to the provided textBlob and returns it
+func (t *Theme) StylizeTextBlob(textBlob *pb.TextBlob) *pb.TextBlob {
+	t.Init()
+	textBlob.Style = t.StyleTextBlob
+	return textBlob
 }
 
 // ConvertStringCharRune takes a string and converts it to a rune slice
@@ -36,131 +150,6 @@ func Style(fg, bg string) *pb.Style {
 		Bg:   bg,
 		Attr: "4",
 	}
-}
-
-func PageTopMenuFullWidthContent(
-	w, h int,
-	links []*PageLink,
-	current, content string) *pb.PageResponse {
-	tpr := pb.PageResponse{
-		Name:     "generic",
-		DivBoxes: &pb.DivBoxes{},
-		Elements: &pb.Elements{},
-	}
-	// build menu
-	xPos := 0
-	menuY := 0
-	menuHeight := 1
-	for i, link := range links {
-		text := fmt.Sprintf("%s (%s)", link.Page, link.KeyStroke)
-		divWidth := len(text) + 3
-		if i != 0 {
-			xPos = xPos + divWidth
-		}
-		divName := fmt.Sprintf("menu-%d", i)
-		divFillSt := Style("white", "black")
-		textStyle := Style("white", "black")
-		if link.Page == current {
-			divFillSt = Style("white", "dimgray")
-			textStyle = Style("white", "dimgray")
-		}
-		tpr.DivBoxes.Boxes = append(tpr.DivBoxes.Boxes, &pb.DivBox{
-			Name:     divName,
-			Border:   false,
-			FillChar: ConvertStringCharRune(" "),
-			//BorderChar: ConvertStringCharRune("*"),
-			StartX: int32(xPos),
-			StartY: int32(menuY),
-			Width:  int32(divWidth),
-			Height: int32(menuHeight),
-			FillSt: divFillSt,
-			//BorderSt: Style("green", "black"),
-		})
-		tpr.Elements.TextBlobs = append(tpr.Elements.TextBlobs, &pb.TextBlob{
-			Content:  text,
-			Wrap:     false,
-			Style:    textStyle,
-			DivNames: []string{divName},
-		})
-		tpr.KeyStrokes = append(tpr.KeyStrokes, &pb.KeyStroke{
-			KeyStroke: link.KeyStroke,
-			Action: &pb.KeyStroke_Link{
-				&pb.Link{
-					PageName: link.Page,
-				},
-			},
-		})
-	}
-
-	// build content
-	contentDivSt := Style("black", "lightslategray")
-	contentTextStyle := Style("black", "lightslategray")
-	//contentY := menuY + menuHeight + 1
-
-	contentY := 1
-	contentHeight := h - 10
-	tpr.DivBoxes.Boxes = append(tpr.DivBoxes.Boxes, &pb.DivBox{
-		Name:     "content",
-		Border:   false,
-		FillChar: ConvertStringCharRune(" "),
-		//BorderChar: ConvertStringCharRune("*"),
-		StartX: int32(1),
-		StartY: int32(contentY),
-		Width:  int32(w),
-		Height: int32(contentHeight),
-		FillSt: contentDivSt,
-		//BorderSt: Style("green", "black"),
-	})
-	tpr.Elements.TextBlobs = append(tpr.Elements.TextBlobs, &pb.TextBlob{
-		Content:  content,
-		Wrap:     true,
-		Style:    contentTextStyle,
-		DivNames: []string{"content"},
-	})
-
-	// build bottom Menu
-	bMenuDivSt := Style("black", "lightslategray")
-	bMenuTextStyle := Style("black", "lightslategray")
-	bMenuY := contentY + contentHeight + 1
-	bMenuHeight := 2
-	bMenuContent := "continue (j)"
-	tpr.DivBoxes.Boxes = append(tpr.DivBoxes.Boxes, &pb.DivBox{
-		Name:     "bMenu",
-		Border:   false,
-		FillChar: ConvertStringCharRune(" "),
-		//BorderChar: ConvertStringCharRune("*"),
-		StartX: int32(1),
-		StartY: int32(bMenuY),
-		Width:  int32(w),
-		Height: int32(bMenuHeight),
-		FillSt: bMenuDivSt,
-		//BorderSt: Style("green", "black"),
-	})
-	tpr.Elements.TextBlobs = append(tpr.Elements.TextBlobs, &pb.TextBlob{
-		Content:  bMenuContent,
-		Wrap:     true,
-		Style:    bMenuTextStyle,
-		DivNames: []string{"bMenu"},
-	})
-	tpr.KeyStrokes = append(tpr.KeyStrokes, &pb.KeyStroke{
-		KeyStroke: "j",
-		Action: &pb.KeyStroke_DivScroll{
-			&pb.DivScroll{
-				DivName: "content",
-				Down:    false,
-			},
-		},
-	})
-	tpr.KeyStrokes = append(tpr.KeyStrokes, &pb.KeyStroke{
-		KeyStroke: "k",
-		Action: &pb.KeyStroke_DivScroll{
-			&pb.DivScroll{
-				DivName: "content",
-				Down:    true,
-			},
-		},
-	})
-	return &tpr
 }
 
 // GrowBox takes a page and a box name then locates it and modifies it's size
@@ -193,20 +182,15 @@ func GenPageLittleBox(x, y int) *pb.PageResponse {
 		Elements:      &pb.Elements{},
 		StreamDelayMs: int32(5),
 	}
-	localPage.DivBoxes.Boxes = append(localPage.DivBoxes.Boxes, &pb.DivBox{
-		Name:       "generated",
-		Border:     true,
-		BorderW:    int32(1),
-		BorderChar: ConvertStringCharRune("^"),
-		FillChar:   ConvertStringCharRune(""),
-		StartX:     int32(x),
-		StartY:     int32(y),
-		Width:      4,
-		Height:     4,
-		BorderSt:   Style("orange", "black"),
-		FillSt:     Style("white", "black"),
-	})
-	//localPage.StreamDelayMs = int32(5)
+	localPage.DivBoxes.Boxes = append(localPage.DivBoxes.Boxes,
+		ThemeDefault.StylizeDivBox(&pb.DivBox{
+			Name:   "generated",
+			Border: true,
+			StartX: int32(x),
+			StartY: int32(y),
+			Width:  4,
+			Height: 4,
+		}))
 	return &localPage
 }
 
@@ -218,25 +202,21 @@ func AddTextBoxToPage(pr *pb.PageResponse, text string) *pb.PageResponse {
 		box := pr.DivBoxes.Boxes[len(pr.DivBoxes.Boxes)-1]
 		startY := box.StartY + 2
 		startX := box.StartX
-		pr.DivBoxes.Boxes = append(pr.DivBoxes.Boxes, &pb.DivBox{
-			Name:       "added",
-			Border:     true,
-			BorderW:    int32(1),
-			BorderChar: ConvertStringCharRune("^"),
-			FillChar:   ConvertStringCharRune(""),
-			StartX:     startX,
-			StartY:     startY,
-			Width:      int32(width),
-			Height:     3,
-			BorderSt:   Style("orange", "black"),
-			FillSt:     Style("white", "black"),
-		})
-		pr.Elements.TextBlobs = append(pr.Elements.TextBlobs, &pb.TextBlob{
-			Content:  text,
-			Wrap:     true,
-			Style:    Style("white", "black"),
-			DivNames: []string{"added"},
-		})
+		pr.DivBoxes.Boxes = append(pr.DivBoxes.Boxes,
+			ThemeDefault.StylizeDivBox(&pb.DivBox{
+				Name:   "added",
+				Border: true,
+				StartX: startX,
+				StartY: startY,
+				Width:  int32(width),
+				Height: 3,
+			}))
+		pr.Elements.TextBlobs = append(pr.Elements.TextBlobs,
+			ThemeDefault.StylizeTextBlob(&pb.TextBlob{
+				Content:  text,
+				Wrap:     true,
+				DivNames: []string{"added"},
+			}))
 	}
 	return pr
 }
@@ -250,25 +230,19 @@ func GenPageSimple(w, h int, text string) *pb.PageResponse {
 		Elements: &pb.Elements{},
 	}
 	newPage.DivBoxes.Boxes = append(newPage.DivBoxes.Boxes, &pb.DivBox{
-		Name:       "generated",
-		Border:     true,
-		BorderW:    int32(1),
-		BorderChar: ConvertStringCharRune("^"),
-		FillChar:   ConvertStringCharRune(""),
-		StartX:     5,
-		StartY:     5,
-		Width:      int32(w - 10),
-		Height:     int32(h - 15),
-		BorderSt:   Style("orange", "black"),
-		FillSt:     Style("white", "black"),
+		Name:   "generated",
+		Border: true,
+		StartX: 5,
+		StartY: 5,
+		Width:  int32(w - 10),
+		Height: int32(h - 15),
 	})
 	newPage.Elements.TextBlobs = append(newPage.Elements.TextBlobs, &pb.TextBlob{
 		Content:  text,
 		Wrap:     true,
-		Style:    Style("white", "black"),
 		DivNames: []string{"generated"},
 	})
-	return &newPage
+	return ThemeDefault.StylizePage(&newPage)
 }
 
 // FindLastBoxEndY takes a page and finds its last div box then returns the extreme
@@ -317,19 +291,15 @@ func AddFormLogin(presp *pb.PageResponse, keyStroke, submitPage string) *pb.Page
 	tbPositionX := FindLastBoxStartX(presp) + 10
 	divStartX := FindLastBoxStartX(presp) + 2
 	divStartY := FindLastBoxStartY(presp) + 4
-	presp.DivBoxes.Boxes = append(presp.DivBoxes.Boxes, &pb.DivBox{
-		Name:       "formDiv",
-		Border:     true,
-		BorderW:    int32(1),
-		BorderChar: ConvertStringCharRune("#"),
-		FillChar:   ConvertStringCharRune(""),
-		StartX:     divStartX,
-		StartY:     divStartY,
-		Width:      75,
-		Height:     7,
-		BorderSt:   Style("blue", "black"),
-		FillSt:     Style("white", "black"),
-	})
+	presp.DivBoxes.Boxes = append(presp.DivBoxes.Boxes,
+		ThemeDefault.StylizeDivBox(&pb.DivBox{
+			Name:   "formDiv",
+			Border: true,
+			StartX: divStartX,
+			StartY: divStartY,
+			Width:  75,
+			Height: 7,
+		}))
 	loginFormName := "loginForm"
 	presp.Elements.Forms = append(presp.Elements.Forms, &pb.Form{
 		Name:    loginFormName,
@@ -338,37 +308,29 @@ func AddFormLogin(presp *pb.PageResponse, keyStroke, submitPage string) *pb.Page
 			PageName: submitPage,
 		},
 		TextBoxes: []*pb.TextBox{
-			&pb.TextBox{
-				Name:             "password",
-				TabOrder:         2,
-				DefaultValue:     "",
-				Description:      "Password: ",
-				PositionX:        tbPositionX,
-				PositionY:        4,
-				Height:           1,
-				Width:            30,
-				StyleCursor:      Style("black", "gray"),
-				StyleFill:        Style("black", "blue"),
-				StyleText:        Style("white", "blue"),
-				StyleDescription: Style("red", "black"),
-				ShowDescription:  true,
-				Password:         true,
-			},
-			&pb.TextBox{
-				Name:             "username",
-				TabOrder:         1,
-				DefaultValue:     "",
-				Description:      "Username: ",
-				PositionX:        tbPositionX,
-				PositionY:        2,
-				Height:           1,
-				Width:            30,
-				StyleCursor:      Style("black", "gray"),
-				StyleFill:        Style("black", "blue"),
-				StyleText:        Style("white", "blue"),
-				StyleDescription: Style("red", "black"),
-				ShowDescription:  true,
-			},
+			ThemeDefault.StylizeTextBox(&pb.TextBox{
+				Name:            "password",
+				TabOrder:        2,
+				DefaultValue:    "",
+				Description:     "Password: ",
+				PositionX:       tbPositionX,
+				PositionY:       4,
+				Height:          1,
+				Width:           30,
+				ShowDescription: true,
+				Password:        true,
+			}),
+			ThemeDefault.StylizeTextBox(&pb.TextBox{
+				Name:            "username",
+				TabOrder:        1,
+				DefaultValue:    "",
+				Description:     "Username: ",
+				PositionX:       tbPositionX,
+				PositionY:       2,
+				Height:          1,
+				Width:           30,
+				ShowDescription: true,
+			}),
 		},
 	})
 	presp.KeyStrokes = append(presp.KeyStrokes, &pb.KeyStroke{
@@ -378,12 +340,12 @@ func AddFormLogin(presp *pb.PageResponse, keyStroke, submitPage string) *pb.Page
 				FormName: loginFormName,
 			}}})
 	msg := fmt.Sprintf("Hit (%s) to activate form", keyStroke)
-	presp.Elements.TextBlobs = append(presp.Elements.TextBlobs, &pb.TextBlob{
-		Content:  msg,
-		Wrap:     true,
-		Style:    Style("white", "black"),
-		DivNames: []string{"formDiv"},
-	})
+	presp.Elements.TextBlobs = append(presp.Elements.TextBlobs,
+		ThemeDefault.StylizeTextBlob(&pb.TextBlob{
+			Content:  msg,
+			Wrap:     true,
+			DivNames: []string{"formDiv"},
+		}))
 	return presp
 
 }
@@ -407,19 +369,15 @@ func AddFormNewUser(presp *pb.PageResponse, keyStroke, submitPage string) *pb.Pa
 	tbPositionX := FindLastBoxStartX(presp) + 18
 	divStartX := FindLastBoxStartX(presp) + 2
 	divStartY := FindLastBoxStartY(presp) + 4
-	presp.DivBoxes.Boxes = append(presp.DivBoxes.Boxes, &pb.DivBox{
-		Name:       "formDiv",
-		Border:     true,
-		BorderW:    int32(1),
-		BorderChar: ConvertStringCharRune("#"),
-		FillChar:   ConvertStringCharRune(""),
-		StartX:     divStartX,
-		StartY:     divStartY,
-		Width:      75,
-		Height:     9,
-		BorderSt:   Style("blue", "black"),
-		FillSt:     Style("white", "black"),
-	})
+	presp.DivBoxes.Boxes = append(presp.DivBoxes.Boxes,
+		ThemeDefault.StylizeDivBox(&pb.DivBox{
+			Name:   "formDiv",
+			Border: true,
+			StartX: divStartX,
+			StartY: divStartY,
+			Width:  75,
+			Height: 9,
+		}))
 	loginFormName := "newUserForm"
 	presp.Elements.Forms = append(presp.Elements.Forms, &pb.Form{
 		Name:    loginFormName,
@@ -428,53 +386,41 @@ func AddFormNewUser(presp *pb.PageResponse, keyStroke, submitPage string) *pb.Pa
 			PageName: submitPage,
 		},
 		TextBoxes: []*pb.TextBox{
-			&pb.TextBox{
-				Name:             "password1",
-				TabOrder:         2,
-				DefaultValue:     "",
-				Description:      "Password: ",
-				PositionX:        tbPositionX,
-				PositionY:        4,
-				Height:           1,
-				Width:            30,
-				StyleCursor:      Style("black", "gray"),
-				StyleFill:        Style("black", "blue"),
-				StyleText:        Style("white", "blue"),
-				StyleDescription: Style("red", "black"),
-				ShowDescription:  true,
-				Password:         true,
-			},
-			&pb.TextBox{
-				Name:             "password2",
-				TabOrder:         3,
-				DefaultValue:     "",
-				Description:      "Re-Type Password: ",
-				PositionX:        tbPositionX,
-				PositionY:        6,
-				Height:           1,
-				Width:            30,
-				StyleCursor:      Style("black", "gray"),
-				StyleFill:        Style("black", "blue"),
-				StyleText:        Style("white", "blue"),
-				StyleDescription: Style("red", "black"),
-				ShowDescription:  true,
-				Password:         true,
-			},
-			&pb.TextBox{
-				Name:             "username",
-				TabOrder:         1,
-				DefaultValue:     "",
-				Description:      "Username: ",
-				PositionX:        tbPositionX,
-				PositionY:        2,
-				Height:           1,
-				Width:            30,
-				StyleCursor:      Style("black", "gray"),
-				StyleFill:        Style("black", "blue"),
-				StyleText:        Style("white", "blue"),
-				StyleDescription: Style("red", "black"),
-				ShowDescription:  true,
-			},
+			ThemeDefault.StylizeTextBox(&pb.TextBox{
+				Name:            "password1",
+				TabOrder:        2,
+				DefaultValue:    "",
+				Description:     "Password: ",
+				PositionX:       tbPositionX,
+				PositionY:       4,
+				Height:          1,
+				Width:           30,
+				ShowDescription: true,
+				Password:        true,
+			}),
+			ThemeDefault.StylizeTextBox(&pb.TextBox{
+				Name:            "password2",
+				TabOrder:        3,
+				DefaultValue:    "",
+				Description:     "Re-Type Password: ",
+				PositionX:       tbPositionX,
+				PositionY:       6,
+				Height:          1,
+				Width:           30,
+				ShowDescription: true,
+				Password:        true,
+			}),
+			ThemeDefault.StylizeTextBox(&pb.TextBox{
+				Name:            "username",
+				TabOrder:        1,
+				DefaultValue:    "",
+				Description:     "Username: ",
+				PositionX:       tbPositionX,
+				PositionY:       2,
+				Height:          1,
+				Width:           30,
+				ShowDescription: true,
+			}),
 		},
 	})
 	presp.KeyStrokes = append(presp.KeyStrokes, &pb.KeyStroke{
@@ -484,11 +430,11 @@ func AddFormNewUser(presp *pb.PageResponse, keyStroke, submitPage string) *pb.Pa
 				FormName: loginFormName,
 			}}})
 	msg := fmt.Sprintf("Hit (%s) to activate form", keyStroke)
-	presp.Elements.TextBlobs = append(presp.Elements.TextBlobs, &pb.TextBlob{
-		Content:  msg,
-		Wrap:     true,
-		Style:    Style("white", "black"),
-		DivNames: []string{"formDiv"},
-	})
+	presp.Elements.TextBlobs = append(presp.Elements.TextBlobs,
+		ThemeDefault.StylizeTextBlob(&pb.TextBlob{
+			Content:  msg,
+			Wrap:     true,
+			DivNames: []string{"formDiv"},
+		}))
 	return presp
 }
