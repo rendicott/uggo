@@ -5,6 +5,7 @@ package uggo
 import (
 	"fmt"
 	pb "github.com/rendicott/uggly"
+	"github.com/google/uuid"
 )
 
 func init() {
@@ -12,16 +13,17 @@ func init() {
 	ThemeGreen = &Theme{
 		StyleTextBoxDescription: Style("yellowgreen", "darkgreen"),
 		StyleTextBoxCursor:      Style("aquamarine", "darkseagreen"),
-		StyleTextBoxText:        Style("springgreen", "green"),
-		StyleTextBoxFill:        Style("springgreen", "green"),
-		StyleDivFill:            Style("darkkhaki", "darkgreen"),
+		StyleTextBoxText:        Style("black", "green"),
+		StyleTextBoxFill:        Style("black", "green"),
+		StyleDivFill:            Style("darkkhaki", "black"),
 		StyleDivBorder:          Style("yellowgreen", "darkgreen"),
-		StyleTextBlob:           Style("yellowgreen", "darkgreen"),
+		StyleTextBlob:           Style("yellowgreen", "black"),
 		DivBorderWidth:          int32(1),
 		DivBorderChar:           ConvertStringCharRune("="),
 		DivFillChar:             ConvertStringCharRune("."),
 	}
 }
+
 
 var ThemeDefault *Theme
 var ThemeGreen *Theme
@@ -29,101 +31,6 @@ var ThemeGreen *Theme
 type PageLink struct {
 	Page      string
 	KeyStroke string
-}
-
-// Theme holds visual settings for components and provides methods
-// for applying those settings to pages and components of pages
-type Theme struct {
-	StyleTextBoxDescription,
-	StyleTextBoxCursor,
-	StyleTextBoxText,
-	StyleTextBoxFill,
-	StyleDivFill,
-	StyleDivBorder,
-	StyleTextBlob *pb.Style
-	DivBorderWidth int32
-	DivBorderChar,
-	DivFillChar rune
-}
-
-// Init instantiates any nil Theme settings with default
-// values
-func (t *Theme) Init() {
-	if t.StyleTextBoxDescription == nil {
-		t.StyleTextBoxDescription = Style("white", "black")
-	}
-	if t.StyleTextBoxCursor == nil {
-		t.StyleTextBoxCursor = Style("black", "white")
-	}
-	if t.StyleTextBoxText == nil {
-		t.StyleTextBoxText = Style("white", "blue")
-	}
-	if t.StyleTextBoxFill == nil {
-		t.StyleTextBoxFill = Style("white", "blue")
-	}
-	if t.StyleDivFill == nil {
-		t.StyleDivFill = Style("white", "black")
-	}
-	if t.StyleDivBorder == nil {
-		t.StyleDivBorder = Style("white", "black")
-	}
-	if t.StyleTextBlob == nil {
-		t.StyleTextBlob = Style("white", "black")
-	}
-	if t.DivFillChar == 0 {
-		t.DivFillChar = ConvertStringCharRune(" ")
-	}
-	if t.DivBorderChar == 0 {
-		t.DivBorderChar = ConvertStringCharRune("*")
-	}
-	if t.DivBorderWidth == 0 {
-		t.DivBorderWidth = int32(1)
-	}
-}
-
-// StylizePage takes a page and applies this theme to the divBoxes,
-// textBlobs, and textBoxes within it and returns the modified page
-func (t *Theme) StylizePage(page *pb.PageResponse) *pb.PageResponse {
-	for i, divBox := range page.DivBoxes.Boxes {
-		page.DivBoxes.Boxes[i] = t.StylizeDivBox(divBox)
-	}
-	for i, textBlob := range page.Elements.TextBlobs {
-		page.Elements.TextBlobs[i] = t.StylizeTextBlob(textBlob)
-	}
-	for i, form := range page.Elements.Forms {
-		for j, textBox := range form.TextBoxes {
-			page.Elements.Forms[i].TextBoxes[j] = t.StylizeTextBox(textBox)
-		}
-	}
-	return page
-}
-
-// StylizeTextBox applies this theme to the provided textBox and returns it
-func (t *Theme) StylizeTextBox(textBox *pb.TextBox) *pb.TextBox {
-	t.Init()
-	textBox.StyleCursor = t.StyleTextBoxCursor
-	textBox.StyleFill = t.StyleTextBoxFill
-	textBox.StyleDescription = t.StyleTextBoxDescription
-	textBox.StyleText = t.StyleTextBoxText
-	return textBox
-}
-
-// StylizeDivBox applies this theme to the provided divBox and returns it
-func (t *Theme) StylizeDivBox(divBox *pb.DivBox) *pb.DivBox {
-	t.Init()
-	divBox.FillSt = t.StyleDivFill
-	divBox.BorderSt = t.StyleDivBorder
-	divBox.BorderW = t.DivBorderWidth
-	divBox.FillChar = t.DivFillChar
-	divBox.BorderChar = t.DivBorderChar
-	return divBox
-}
-
-// StylizeTextBlob applies this theme to the provided textBlob and returns it
-func (t *Theme) StylizeTextBlob(textBlob *pb.TextBlob) *pb.TextBlob {
-	t.Init()
-	textBlob.Style = t.StyleTextBlob
-	return textBlob
 }
 
 // ConvertStringCharRune takes a string and converts it to a rune slice
@@ -150,6 +57,22 @@ func Style(fg, bg string) *pb.Style {
 		Bg:   bg,
 		Attr: "4",
 	}
+}
+
+// StrokeMap provides a list of unique keyboard shortcuts that require no
+// modifies and are generally easy for the user to hit. Useful for iterating
+// through when dynamically assigning links to lists of items
+var StrokeMap = []string{"1", "2", "3", "4", "5", "6", "7", "8", "9",
+	"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+	"n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}
+
+// Percent takes a percentage as an integer (e.g., 20) and then calculates
+// that percentage of the second argument then returns as an int32. Useful
+// for designing DivBox sizes and positioning components on screen.
+func Percent(perc int, outof int) int32 {
+	p := float64(float64(perc) / float64(100))
+	o := float64(outof)
+	return int32(p*o)
 }
 
 // GrowBox takes a page and a box name then locates it and modifies it's size
@@ -285,6 +208,48 @@ func FindLastBoxStartY(presp *pb.PageResponse) int32 {
 	return int32(0)
 }
 
+func FindFirstBoxName(presp *pb.PageResponse) string {
+	if len(presp.DivBoxes.Boxes) > 0 {
+		firstBox := presp.DivBoxes.Boxes[0]
+		return firstBox.Name
+	}
+	return ""
+}
+
+func AddFormSimpleTextBox(
+		presp *pb.PageResponse,
+		x, y int,
+		keyStroke, submitPage, divName string) *pb.PageResponse {
+
+	formName := "simple"
+	presp.Elements.Forms = append(presp.Elements.Forms, &pb.Form{
+		Name:    formName,
+		DivName: divName,
+		SubmitLink: &pb.Link{
+			PageName: submitPage,
+		},
+		TextBoxes: []*pb.TextBox{
+			ThemeDefault.StylizeTextBox(&pb.TextBox{
+				Name:            "generated",
+				TabOrder:        1,
+				DefaultValue:    "hi",
+				PositionX:       int32(x),
+				PositionY:       int32(y),
+				Height:          1,
+				Width:           30,
+				ShowDescription: false,
+			}),
+		},
+	})
+	presp.KeyStrokes = append(presp.KeyStrokes, &pb.KeyStroke{
+		KeyStroke: keyStroke,
+		Action: &pb.KeyStroke_FormActivation{
+			FormActivation: &pb.FormActivation{
+				FormName: formName,
+			}}})
+	return presp
+}
+
 // AddFormLogin takes a page and adds a login div, form, helptext, and activation link to it
 // it starts the formDiv a few lines below the last divbox on the page
 func AddFormLogin(presp *pb.PageResponse, keyStroke, submitPage string) *pb.PageResponse {
@@ -350,8 +315,9 @@ func AddFormLogin(presp *pb.PageResponse, keyStroke, submitPage string) *pb.Page
 
 }
 
-// AddLink adds a link to the given destination on the provided page using the provided keystroke
-// with an indication as to whether or not it's a link to a stream
+// AddLink adds a link to the given same-server destination on the provided page 
+// using the provided keystroke with an indication as to whether or not 
+// it's a link to a stream
 func AddLink(presp *pb.PageResponse, keyStroke, pageName string, stream bool) *pb.PageResponse {
 	presp.KeyStrokes = append(presp.KeyStrokes, &pb.KeyStroke{
 		KeyStroke: keyStroke,
@@ -436,5 +402,38 @@ func AddFormNewUser(presp *pb.PageResponse, keyStroke, submitPage string) *pb.Pa
 			Wrap:     true,
 			DivNames: []string{"formDiv"},
 		}))
+	return presp
+}
+// NewUuid returns a Uuid string. Helpful for guaranteeing unique component names
+// or authorzing messages within packages.
+func NewUuid() string {
+	return uuid.New().String()
+}
+
+// AddTextAtGeo takes a page, string and coordinates and then modifies the page with
+// a new DivBox at the given coordinates and a TextBlob with the provided string
+// Useful when you want to add text at specific locations on a page without the hassle
+// DivBox border is forcibly removed despite what the Theme specifies. 
+func AddTextAt(presp *pb.PageResponse, x, y, w, h int, text string) *pb.PageResponse {
+	divName := fmt.Sprintf("generated-%s", uuid.New())
+	divBox := &pb.DivBox{
+		Name:   divName,
+		Border: false,
+		StartX: int32(x),
+		StartY: int32(y),
+		Width:  int32(w),
+		Height: int32(h),
+	}
+	textBlob := &pb.TextBlob{
+		Content:  text,
+		Wrap:     true,
+		DivNames: []string{divName},
+	}
+	// stylize so we can clear some things
+	divBox = ThemeDefault.StylizeDivBox(divBox)
+	textBlob = ThemeDefault.StylizeTextBlob(textBlob)
+	divBox.Border = false
+	presp.DivBoxes.Boxes = append(presp.DivBoxes.Boxes, divBox)
+	presp.Elements.TextBlobs = append(presp.Elements.TextBlobs, textBlob)
 	return presp
 }
